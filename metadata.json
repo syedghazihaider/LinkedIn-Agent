@@ -1,0 +1,6 @@
+{
+  "name": "LinkedIn AI Agent",
+  "description": "An interactive AI agent built to help professionals grow their LinkedIn presence, optimize their profile, and schedule engaging posts.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

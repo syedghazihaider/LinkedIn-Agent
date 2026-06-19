@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sparkles, FileText, Send, UserCheck, Play, Upload, AlertCircle, Loader2, Linkedin, Link2 } from 'lucide-react';
+import { MemoryItem } from '../types';
+import { getMemoryItems } from './MemoryVault';
 
 interface OnboardingProps {
   onSubmit: (input: string) => void;
@@ -51,6 +53,22 @@ export default function Onboarding({ onSubmit, isLoading }: OnboardingProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [fileName, setFileName] = useState("");
   const [uploadError, setUploadError] = useState("");
+
+  const [savedMemories, setSavedMemories] = useState<MemoryItem[]>([]);
+
+  useEffect(() => {
+    // Initial fetch
+    setSavedMemories(getMemoryItems());
+
+    // Listen to real-time events triggered from MemoryVault
+    const handleMemoryUpdated = () => {
+      setSavedMemories(getMemoryItems());
+    };
+    window.addEventListener("ghazi_memory_updated", handleMemoryUpdated);
+    return () => {
+      window.removeEventListener("ghazi_memory_updated", handleMemoryUpdated);
+    };
+  }, []);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -107,7 +125,12 @@ export default function Onboarding({ onSubmit, isLoading }: OnboardingProps) {
         }
       } catch (err: any) {
         console.error("Resume extractor error:", err);
-        setUploadError(`Error parsing ${file.name}: ${err.message || "Please copy-paste raw text instead."}`);
+        const errStr = err.message || "";
+        if (errStr.includes("quota") || errStr.includes("429") || errStr.includes("RESOURCE_EXHAUSTED") || errStr.includes("Limit")) {
+          setUploadError(`API Quota Exceeded (Limit: 20 calls/day reached). \n💡 Tip: You can bypass this instantly! Simply copy-paste your resume or LinkedIn bio text directly using the "Write or Paste Text" tab above, which supports fully functional instant template fallbacks!`);
+        } else {
+          setUploadError(`Error parsing ${file.name}: ${errStr || "Please copy-paste raw text instead."}`);
+        }
       } finally {
         setIsExtracting(false);
       }
@@ -260,6 +283,25 @@ export default function Onboarding({ onSubmit, isLoading }: OnboardingProps) {
                       disabled={isLoading}
                     />
                   </div>
+                  {/* Memory Vault category link suggestions */}
+                  {savedMemories.filter(m => m.type === "link" && m.enabled).length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                      <span className="text-[10px] text-slate-400 font-semibold flex items-center gap-1">
+                        🧠 Saved links:
+                      </span>
+                      {savedMemories.filter(m => m.type === "link" && m.enabled).map(item => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setLinkedinUrl(item.value)}
+                          className="bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded border border-blue-200/40 cursor-pointer transition-all flex items-center gap-0.5"
+                          title={item.value}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <span className="text-[10px] text-slate-400 block font-normal leading-relaxed">
                     Enter the public profile link. The agent will retrieve SEO elements, audit current details, and index custom stats.
                   </span>
@@ -283,6 +325,25 @@ export default function Onboarding({ onSubmit, isLoading }: OnboardingProps) {
                       disabled={isLoading}
                     />
                   </div>
+                  {/* Memory Vault category name suggestions */}
+                  {savedMemories.filter(m => m.type === "name" && m.enabled).length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                      <span className="text-[10px] text-slate-400 font-semibold flex items-center gap-1">
+                        🧠 Saved names:
+                      </span>
+                      {savedMemories.filter(m => m.type === "name" && m.enabled).map(item => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setCandidateName(item.value)}
+                          className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-0.5 rounded border border-indigo-200/40 cursor-pointer transition-all"
+                          title={item.value}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
@@ -349,6 +410,35 @@ export default function Onboarding({ onSubmit, isLoading }: OnboardingProps) {
                     required={onboardingMode === 'resume'}
                     id="resume-input-field"
                   />
+                  {/* Memory Vault category text/prompt suggestions */}
+                  {savedMemories.filter(m => (m.type === "text" || m.type === "prompt") && m.enabled).length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                      <span className="text-[10px] text-slate-500 font-semibold block w-full mb-1">
+                        🧠 Saved Bios & Prompts (Click to Use):
+                      </span>
+                      {savedMemories.filter(m => (m.type === "text" || m.type === "prompt") && m.enabled).map(item => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            if (inputText.trim()) {
+                              if (confirm("Replace current text with this saved memory? Click Cancel to append instead.")) {
+                                setInputText(item.value);
+                              } else {
+                                setInputText(inputText + "\n\n" + item.value);
+                              }
+                            } else {
+                              setInputText(item.value);
+                            }
+                          }}
+                          className="bg-emerald-55 hover:bg-emerald-100 text-emerald-8 bg-emerald-50 text-xs px-2.0 py-1 rounded border border-emerald-250 cursor-pointer transition-all mr-1.5 text-left text-[11px] leading-tight max-w-full font-medium"
+                          title={item.value}
+                        >
+                          + {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

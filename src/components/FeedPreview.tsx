@@ -1,6 +1,211 @@
 import React, { useState } from 'react';
-import { Copy, Check, MessageSquare, Repeat, Heart, Send, Calendar, Lightbulb, Image as ImageIcon, Terminal, Code2, Loader2, Sparkles } from 'lucide-react';
+import { Copy, Check, MessageSquare, Repeat, Heart, Send, Calendar, Lightbulb, Image as ImageIcon, Terminal, Code2, Loader2, Sparkles, Maximize2 } from 'lucide-react';
 import { LinkedInPost } from '../types';
+import ImageViewerModal from './ImageViewerModal';
+
+// Shared modular SVG generation helper functions
+export const getTerminalSvgString = (simulation: any): string => {
+  if (!simulation) return "";
+  const { directory, command, outputLines } = simulation;
+
+  const width = 620;
+  const headerHeight = 42;
+  const padding = 22;
+  const lineHeight = 21;
+  const linesCount = (outputLines || []).length + 2; 
+  const height = headerHeight + padding + (linesCount * lineHeight) + padding + 15;
+
+  const escapeXml = (unsafe: string) => {
+    return (unsafe || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&apos;");
+  };
+
+  let textElements = "";
+  let yOffset = headerHeight + padding + lineHeight - 5;
+
+  textElements += `
+    <text x="${padding}" y="${yOffset}" font-family="JetBrains Mono, Courier New, monospace" font-size="12" fill="#58a6ff" font-weight="bold">
+      user@ghazi-pro:<tspan fill="#3fb950">${escapeXml(directory || "~")}</tspan><tspan fill="#c9d1d9">$</tspan> <tspan fill="#ffffff" font-weight="bold">${escapeXml(command || "")}</tspan>
+    </text>
+  `;
+
+  (outputLines || []).forEach((line: string) => {
+    yOffset += lineHeight;
+    let fill = "#c9d1d9";
+    let weight = "normal";
+    if (line.includes("Successfully") || line.includes("SUCCESS") || line.includes("completed") || line.includes("done") || line.includes("OK")) {
+      fill = "#3fb950";
+      weight = "bold";
+    } else if (line.includes("Step") || line.includes("Building") || line.includes("Creating") || line.includes("Pushing")) {
+      fill = "#58a6ff";
+      weight = "bold";
+    } else if (line.includes("warning") || line.includes("WARN")) {
+      fill = "#d29922";
+    } else if (line.includes("Executing") || line.includes("Running") || line.includes("index")) {
+      fill = "#8b949e";
+    }
+
+    textElements += `
+      <text x="${padding + 4}" y="${yOffset}" font-family="JetBrains Mono, Courier New, monospace" font-size="11.5" fill="${fill}" font-weight="${weight}">
+        ${escapeXml(line)}
+      </text>
+    `;
+  });
+
+  yOffset += lineHeight;
+  textElements += `
+    <text x="${padding}" y="${yOffset}" font-family="JetBrains Mono, Courier New, monospace" font-size="12" fill="#8b949e" opacity="0.8">
+      $ _
+    </text>
+  `;
+
+  return `
+    <svg xmlns="http://www.w3.org/2500/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
+      <rect width="100%" height="100%" rx="12" fill="#0c1017" stroke="#30363d" stroke-width="1.5" />
+      <rect width="100%" height="${headerHeight}" rx="12" fill="#161b22" />
+      <rect y="22" width="100%" height="20" fill="#161b22" />
+      <line x1="0" y1="${headerHeight}" x2="${width}" y2="${headerHeight}" stroke="#30363d" stroke-width="1" />
+
+      <circle cx="22" cy="21" r="6" fill="#ff5f56" />
+      <circle cx="42" cy="21" r="6" fill="#ffbd2e" />
+      <circle cx="62" cy="21" r="6" fill="#27c93f" />
+
+      <text x="50%" y="25" font-family="system-ui, -apple-system, sans-serif" font-size="11.5" font-weight="bold" fill="#8b949e" text-anchor="middle">
+        bash • ${escapeXml(directory || "~")}
+      </text>
+
+      <text x="${width - 20}" y="25" font-family="system-ui, -apple-system, sans-serif" font-size="9.5" fill="#2ea043" font-weight="bold" text-anchor="end">
+        ● LIVE PROCESS
+      </text>
+
+      ${textElements}
+    </svg>
+  `.trim();
+};
+
+export const getCodeSvgString = (simulation: any): string => {
+  if (!simulation) return "";
+  const { language, fileName, codeLineList } = simulation;
+
+  const width = 620;
+  const headerHeight = 42;
+  const padding = 22;
+  const lineHeight = 21;
+  const linesCount = (codeLineList || []).length; 
+  const height = headerHeight + padding + (linesCount * lineHeight) + padding + 10;
+
+  const escapeXml = (unsafe: string) => {
+    return (unsafe || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&apos;");
+  };
+
+  let textElements = "";
+  let yOffset = headerHeight + padding + 14;
+
+  (codeLineList || []).forEach((line: string, index: number) => {
+    const lineNum = index + 1;
+    textElements += `
+      <text x="${padding + 8}" y="${yOffset}" font-family="JetBrains Mono, Courier New, monospace" font-size="11.5" fill="#4b5563" text-anchor="end">
+        ${lineNum}
+      </text>
+      <text x="${padding + 28}" y="${yOffset}" font-family="JetBrains Mono, Courier New, monospace" font-size="11.5" fill="#e2e8f0">
+        ${escapeXml(line)}
+      </text>
+    `;
+    yOffset += lineHeight;
+  });
+
+  return `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
+      <rect width="100%" height="100%" rx="12" fill="#0b0f19" stroke="#1e293b" stroke-width="1.5" />
+      <rect width="100%" height="${headerHeight}" rx="12" fill="#111827" />
+      <rect y="22" width="100%" height="20" fill="#111827" />
+      <line x1="0" y1="${headerHeight}" x2="${width}" y2="${headerHeight}" stroke="#1e293b" stroke-width="1" />
+
+      <circle cx="22" cy="21" r="6" fill="#ff5f56" />
+      <circle cx="42" cy="21" r="6" fill="#ffbd2e" />
+      <circle cx="62" cy="21" r="6" fill="#27c93f" />
+
+      <text x="50%" y="25" font-family="system-ui, -apple-system, sans-serif" font-size="11.5" font-weight="bold" fill="#9ca3af" text-anchor="middle">
+        📝 ${escapeXml(fileName || "snippet.py")} • ${escapeXml(language || "Code")}
+      </text>
+
+      <text x="${width - 20}" y="25" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#60a5fa" font-weight="bold" text-anchor="end">
+        IDE MODE
+      </text>
+
+      ${textElements}
+    </svg>
+  `.trim();
+};
+
+export const getQuoteCardSvgString = (post: any): string => {
+  if (!post) return "";
+  const { topic, hook } = post;
+
+  const width = 600;
+  const height = 400;
+
+  const escapeXml = (unsafe: string) => {
+    return (unsafe || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&apos;");
+  };
+
+  const hookLines = (hook || "").split('\n');
+  let hookTextContent = "";
+  let yOffset = 180;
+  hookLines.forEach((line: string) => {
+    hookTextContent += `
+      <text x="50%" y="${yOffset}" font-family="system-ui, -apple-system, sans-serif" font-size="17" font-style="italic" fill="#ffffff" text-anchor="middle" font-weight="500">
+        "${escapeXml(line)}"
+      </text>
+    `;
+    yOffset += 28;
+  });
+
+  return `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
+      <defs>
+        <linearGradient id="quoteGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#1e3a8a" />
+          <stop offset="50%" stop-color="#0f172a" />
+          <stop offset="100%" stop-color="#020617" />
+        </linearGradient>
+      </defs>
+
+      <rect width="100%" height="100%" rx="16" fill="url(#quoteGrad)" stroke="#1e293b" stroke-width="2" />
+      <circle cx="50" cy="50" r="120" fill="#ffffff" opacity="0.015" />
+      <circle cx="550" cy="350" r="160" fill="#2563eb" opacity="0.04" />
+
+      <text x="50%" y="115" font-family="Georgia, serif" font-size="110" fill="#2563eb" opacity="0.32" text-anchor="middle">
+        “
+      </text>
+
+      <text x="50%" y="138" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold" fill="#3b82f6" letter-spacing="2" text-anchor="middle">
+        ${escapeXml(topic || "INSIGHTS").toUpperCase()}
+      </text>
+
+      ${hookTextContent}
+
+      <line x1="150" y1="330" x2="450" y2="330" stroke="#1e293b" stroke-width="1" />
+      <text x="50%" y="355" font-family="system-ui, -apple-system, sans-serif" font-size="11" fill="#94a3b8" text-anchor="middle">
+        LinkedIn Agent Tool • Created by Syed Ghazi Haider
+      </text>
+    </svg>
+  `.trim();
+};
 
 interface FeedPreviewProps {
   posts: LinkedInPost[];
@@ -15,6 +220,19 @@ export default function FeedPreview({ posts, profileContext }: FeedPreviewProps)
   const [customError, setCustomError] = useState("");
   const [copiedCustom, setCopiedCustom] = useState(false);
   const [selectedMockupTab, setSelectedMockupTab] = useState<'terminal' | 'ide' | 'quote'>('terminal');
+
+  // Image Fullscreen Viewer state
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerTitle, setViewerTitle] = useState("");
+  const [viewerSvg, setViewerSvg] = useState("");
+  const [viewerFilename, setViewerFilename] = useState("");
+
+  const handleOpenViewer = (title: string, svg: string, filename: string) => {
+    setViewerTitle(title);
+    setViewerSvg(svg);
+    setViewerFilename(filename);
+    setViewerOpen(true);
+  };
 
   const copyPostContent = (post: LinkedInPost, index: number) => {
     const formattedPost = `Topic: ${post.topic}\n\n${post.hook}\n\n${post.fullPost}\n\n${post.hashtags.join(' ')}`;
@@ -34,91 +252,12 @@ export default function FeedPreview({ posts, profileContext }: FeedPreviewProps)
 
   const downloadTerminalAsSVG = (simulation: any) => {
     if (!simulation) return;
-    const { directory, command, outputLines } = simulation;
-
-    const width = 620;
-    const headerHeight = 42;
-    const padding = 22;
-    const lineHeight = 21;
-    const linesCount = (outputLines || []).length + 2; 
-    const height = headerHeight + padding + (linesCount * lineHeight) + padding + 15;
-
-    const escapeXml = (unsafe: string) => {
-      return unsafe
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&apos;");
-    };
-
-    let textElements = "";
-    let yOffset = headerHeight + padding + lineHeight - 5;
-
-    textElements += `
-      <text x="${padding}" y="${yOffset}" font-family="JetBrains Mono, Courier New, monospace" font-size="12" fill="#58a6ff" font-weight="bold">
-        user@ghazi-pro:<tspan fill="#3fb950">${escapeXml(directory || "~")}</tspan><tspan fill="#c9d1d9">$</tspan> <tspan fill="#ffffff" font-weight="bold">${escapeXml(command || "")}</tspan>
-      </text>
-    `;
-
-    (outputLines || []).forEach((line: string) => {
-      yOffset += lineHeight;
-      let fill = "#c9d1d9";
-      let weight = "normal";
-      if (line.includes("Successfully") || line.includes("SUCCESS") || line.includes("completed") || line.includes("done") || line.includes("OK")) {
-        fill = "#3fb950";
-        weight = "bold";
-      } else if (line.includes("Step") || line.includes("Building") || line.includes("Creating") || line.includes("Pushing")) {
-        fill = "#58a6ff";
-        weight = "bold";
-      } else if (line.includes("warning") || line.includes("WARN")) {
-        fill = "#d29922";
-      } else if (line.includes("Executing") || line.includes("Running") || line.includes("index")) {
-        fill = "#8b949e";
-      }
-
-      textElements += `
-        <text x="${padding + 4}" y="${yOffset}" font-family="JetBrains Mono, Courier New, monospace" font-size="11.5" fill="${fill}" font-weight="${weight}">
-          ${escapeXml(line)}
-        </text>
-      `;
-    });
-
-    yOffset += lineHeight;
-    textElements += `
-      <text x="${padding}" y="${yOffset}" font-family="JetBrains Mono, Courier New, monospace" font-size="12" fill="#8b949e" opacity="0.8">
-        $ _
-      </text>
-    `;
-
-    const svgContent = `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
-        <rect width="100%" height="100%" rx="12" fill="#0c1017" stroke="#30363d" stroke-width="1.5" />
-        <rect width="100%" height="${headerHeight}" rx="12" fill="#161b22" />
-        <rect y="22" width="100%" height="20" fill="#161b22" />
-        <line x1="0" y1="${headerHeight}" x2="${width}" y2="${headerHeight}" stroke="#30363d" stroke-width="1" />
-
-        <circle cx="22" cy="21" r="6" fill="#ff5f56" />
-        <circle cx="42" cy="21" r="6" fill="#ffbd2e" />
-        <circle cx="62" cy="21" r="6" fill="#27c93f" />
-
-        <text x="50%" y="25" font-family="system-ui, -apple-system, sans-serif" font-size="11.5" font-weight="bold" fill="#8b949e" text-anchor="middle">
-          bash • ${escapeXml(directory || "~")} (Simulation Logs)
-        </text>
-
-        <text x="${width - 20}" y="25" font-family="system-ui, -apple-system, sans-serif" font-size="9.5" fill="#2ea043" font-weight="bold" text-anchor="end">
-          ● LIVE PROCESS
-        </text>
-
-        ${textElements}
-      </svg>
-    `.trim();
-
+    const svgContent = getTerminalSvgString(simulation);
     const blob = new Blob([svgContent], { type: "image/svg+xml;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `terminal_${(directory || 'simulation').replace(/[^a-z0-9]/gi, '_').toLowerCase()}.svg`;
+    link.download = `terminal_${(simulation.directory || 'simulation').replace(/[^a-z0-9]/gi, '_').toLowerCase()}.svg`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -127,68 +266,12 @@ export default function FeedPreview({ posts, profileContext }: FeedPreviewProps)
 
   const downloadCodeAsSVG = (simulation: any) => {
     if (!simulation) return;
-    const { language, fileName, codeLineList } = simulation;
-
-    const width = 620;
-    const headerHeight = 42;
-    const padding = 22;
-    const lineHeight = 21;
-    const linesCount = (codeLineList || []).length; 
-    const height = headerHeight + padding + (linesCount * lineHeight) + padding + 10;
-
-    const escapeXml = (unsafe: string) => {
-      return unsafe
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&apos;");
-    };
-
-    let textElements = "";
-    let yOffset = headerHeight + padding + 14;
-
-    (codeLineList || []).forEach((line: string, index: number) => {
-      const lineNum = index + 1;
-      textElements += `
-        <text x="${padding + 8}" y="${yOffset}" font-family="JetBrains Mono, Courier New, monospace" font-size="11.5" fill="#4b5563" text-anchor="end">
-          ${lineNum}
-        </text>
-        <text x="${padding + 28}" y="${yOffset}" font-family="JetBrains Mono, Courier New, monospace" font-size="11.5" fill="#e2e8f0">
-          ${escapeXml(line)}
-        </text>
-      `;
-      yOffset += lineHeight;
-    });
-
-    const svgContent = `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
-        <rect width="100%" height="100%" rx="12" fill="#0b0f19" stroke="#1e293b" stroke-width="1.5" />
-        <rect width="100%" height="${headerHeight}" rx="12" fill="#111827" />
-        <rect y="22" width="100%" height="20" fill="#111827" />
-        <line x1="0" y1="${headerHeight}" x2="${width}" y2="${headerHeight}" stroke="#1e293b" stroke-width="1" />
-
-        <circle cx="22" cy="21" r="6" fill="#ff5f56" />
-        <circle cx="42" cy="21" r="6" fill="#ffbd2e" />
-        <circle cx="62" cy="21" r="6" fill="#27c93f" />
-
-        <text x="50%" y="25" font-family="system-ui, -apple-system, sans-serif" font-size="11.5" font-weight="bold" fill="#9ca3af" text-anchor="middle">
-          📝 ${escapeXml(fileName || "snippet.py")} • ${escapeXml(language || "Code")}
-        </text>
-
-        <text x="${width - 20}" y="25" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#60a5fa" font-weight="bold" text-anchor="end">
-          IDE MODE
-        </text>
-
-        ${textElements}
-      </svg>
-    `.trim();
-
+    const svgContent = getCodeSvgString(simulation);
     const blob = new Blob([svgContent], { type: "image/svg+xml;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `code_${(fileName || 'snippet').replace(/[^a-z0-9]/gi, '_').toLowerCase()}.svg`;
+    link.download = `code_${(simulation.fileName || 'snippet').replace(/[^a-z0-9]/gi, '_').toLowerCase()}.svg`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -197,73 +280,18 @@ export default function FeedPreview({ posts, profileContext }: FeedPreviewProps)
 
   const downloadQuoteCardAsSVG = (post: any) => {
     if (!post) return;
-    const { topic, hook } = post;
-
-    const width = 600;
-    const height = 400;
-
-    const escapeXml = (unsafe: string) => {
-      return unsafe
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&apos;");
-    };
-
-    const hookLines = (hook || "").split('\n');
-    let hookTextContent = "";
-    let yOffset = 180;
-    hookLines.forEach((line: string) => {
-      hookTextContent += `
-        <text x="50%" y="${yOffset}" font-family="system-ui, -apple-system, sans-serif" font-size="17" font-style="italic" fill="#ffffff" text-anchor="middle" font-weight="500">
-          "${escapeXml(line)}"
-        </text>
-      `;
-      yOffset += 28;
-    });
-
-    const svgContent = `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
-        <defs>
-          <linearGradient id="quoteGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#1e3a8a" />
-            <stop offset="50%" stop-color="#0f172a" />
-            <stop offset="100%" stop-color="#020617" />
-          </linearGradient>
-        </defs>
-
-        <rect width="100%" height="100%" rx="16" fill="url(#quoteGrad)" stroke="#1e293b" stroke-width="2" />
-        <circle cx="50" cy="50" r="120" fill="#ffffff" opacity="0.015" />
-        <circle cx="550" cy="350" r="160" fill="#2563eb" opacity="0.04" />
-
-        <text x="50%" y="115" font-family="Georgia, serif" font-size="110" fill="#2563eb" opacity="0.32" text-anchor="middle">
-          “
-        </text>
-
-        <text x="50%" y="138" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold" fill="#3b82f6" letter-spacing="2" text-anchor="middle">
-          ${escapeXml(topic || "INSIGHTS").toUpperCase()}
-        </text>
-
-        ${hookTextContent}
-
-        <line x1="150" y1="330" x2="450" y2="330" stroke="#1e293b" stroke-width="1" />
-        <text x="50%" y="355" font-family="system-ui, -apple-system, sans-serif" font-size="11" fill="#94a3b8" text-anchor="middle">
-          LinkedIn Agent Tool • Created by Syed Ghazi Haider
-        </text>
-      </svg>
-    `.trim();
-
+    const svgContent = getQuoteCardSvgString(post);
     const blob = new Blob([svgContent], { type: "image/svg+xml;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `quote_${(topic || 'post').replace(/[^a-z0-9]/gi, '_').toLowerCase()}.svg`;
+    link.download = `quote_${(post.topic || 'post').replace(/[^a-z0-9]/gi, '_').toLowerCase()}.svg`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
+
 
   const generateCustomTopic = async (topicName: string) => {
     if (!topicName.trim()) return;
@@ -281,7 +309,8 @@ export default function FeedPreview({ posts, profileContext }: FeedPreviewProps)
         }),
       });
       if (!response.ok) {
-        throw new Error("Failed to generate custom post draft.");
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to generate custom post draft.");
       }
       const data = await response.json();
       setCustomResponse(data);
@@ -410,15 +439,25 @@ export default function FeedPreview({ posts, profileContext }: FeedPreviewProps)
                   ✨
                 </div>
                 <div>
-                  <div className="font-bold text-slate-900 text-sm tracking-tight flex items-center gap-1.5">
+                  <div className="font-bold text-slate-900 text-sm tracking-tight flex items-center gap-1.5 flex-wrap">
                     Custom Simulated Post Generated
                     <span className="text-[10px] bg-blue-100 text-blue-700 border border-blue-200/50 px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
                       TERMINAL ENABLED
                     </span>
+                    {customResponse.isQuotaFallback && (
+                      <span className="text-[10px] bg-amber-100 text-amber-700 border border-amber-200/50 px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                        QUOTA PROTECTION ACTIVE
+                      </span>
+                    )}
                   </div>
                   <p className="text-[11px] text-slate-400 font-medium">
                      Topic matches: <strong className="text-slate-600">{customResponse.post.topic}</strong>
                   </p>
+                  {customResponse.isQuotaFallback && (
+                    <div className="mt-2 bg-amber-50 text-amber-800 border border-amber-100 text-[10px] p-2 py-1.5 rounded-lg leading-relaxed font-normal max-w-sm">
+                      💡 <strong>Quota Protection:</strong> A pre-modeled, gorgeous template has been generated offline matching your exact custom topic.
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -564,8 +603,17 @@ export default function FeedPreview({ posts, profileContext }: FeedPreviewProps)
 
                     {/* Download bar */}
                     <div className="bg-[#161b22] px-4 py-3 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 font-sans text-[11px] text-slate-400">
-                      <span className="text-left sm:max-w-[320px]">⚡ Download this professional vector terminal run logs simulation to attach as your post attachment!</span>
-                      <div className="flex items-center gap-3 shrink-0 self-end sm:self-auto">
+                      <span className="text-left sm:max-w-[320px]">⚡ Download this professional vector terminal run logs simulation or open in zoomable full screen!</span>
+                      <div className="flex flex-wrap items-center gap-2 shrink-0 self-end sm:self-auto">
+                        <button 
+                          type="button"
+                          onClick={() => handleOpenViewer("Bash Terminal Simulation Log", getTerminalSvgString(customResponse.terminalSimulation), "terminal_logs")}
+                          className="bg-slate-800 hover:bg-slate-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer flex items-center gap-1 shrink-0 border border-slate-700"
+                          title="Open zoomable full screen player"
+                        >
+                          <Maximize2 size={12} fill="none" />
+                          Full Screen 🔍
+                        </button>
                         <button 
                           type="button"
                           onClick={() => downloadTerminalAsSVG(customResponse.terminalSimulation)}
@@ -626,15 +674,26 @@ export default function FeedPreview({ posts, profileContext }: FeedPreviewProps)
 
                     {/* Download bar */}
                     <div className="bg-[#111827] px-4 py-3 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 font-sans text-[11px] text-slate-400">
-                      <span className="text-left sm:max-w-[320px]">⚡ Download this clean IDE-style syntax-vibrant code editor snippet as a vector image!</span>
-                      <button 
-                        type="button"
-                        onClick={() => downloadCodeAsSVG(customResponse.codeSimulation)}
-                        className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer flex items-center gap-1 shrink-0 self-end sm:self-auto shadow-lg hover:shadow-xl hover:scale-102 active:scale-98"
-                      >
-                        <ImageIcon size={12} />
-                        Download IDE Code SVG
-                      </button>
+                      <span className="text-left sm:max-w-[320px]">⚡ Download this clean IDE-style syntax-vibrant code editor snippet or display in zoomable full screen!</span>
+                      <div className="flex flex-wrap items-center gap-2 shrink-0 self-end sm:self-auto">
+                        <button 
+                          type="button"
+                          onClick={() => handleOpenViewer("IDE Code Snippet mockup", getCodeSvgString(customResponse.codeSimulation), "ide_snippet")}
+                          className="bg-slate-800 hover:bg-slate-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer flex items-center gap-1 shrink-0 border border-slate-700"
+                          title="Open zoomable full screen player"
+                        >
+                          <Maximize2 size={12} fill="none" />
+                          Full Screen 🔍
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => downloadCodeAsSVG(customResponse.codeSimulation)}
+                          className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer flex items-center gap-1 shrink-0 shadow-lg hover:shadow-xl hover:scale-102 active:scale-98"
+                        >
+                          <ImageIcon size={12} />
+                          Download IDE Code SVG
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -656,14 +715,25 @@ export default function FeedPreview({ posts, profileContext }: FeedPreviewProps)
 
                     <div className="pt-4 border-t border-slate-800/65 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-slate-400 font-sans mt-4">
                       <span>Designed & branded vector output</span>
-                      <button 
-                        type="button"
-                        onClick={() => downloadQuoteCardAsSVG(customResponse.post)}
-                        className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer flex items-center gap-1 shrink-0 shadow-lg hover:shadow-xl hover:scale-102 active:scale-98 self-end sm:self-auto"
-                      >
-                        <ImageIcon size={12} />
-                        Download Quote Card SVG
-                      </button>
+                      <div className="flex flex-wrap items-center gap-2 shrink-0 self-end sm:self-auto">
+                        <button 
+                          type="button"
+                          onClick={() => handleOpenViewer("High-Impact Quote Card", getQuoteCardSvgString(customResponse.post), "quote_card")}
+                          className="bg-slate-800 hover:bg-slate-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer flex items-center gap-1 shrink-0 border border-slate-700"
+                          title="Open zoomable full screen player"
+                        >
+                          <Maximize2 size={12} fill="none" />
+                          Full Screen 🔍
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => downloadQuoteCardAsSVG(customResponse.post)}
+                          className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer flex items-center gap-1 shrink-0 shadow-lg hover:shadow-xl hover:scale-102 active:scale-98 self-end sm:self-auto"
+                        >
+                          <ImageIcon size={12} />
+                          Download Quote Card SVG
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -823,6 +893,15 @@ export default function FeedPreview({ posts, profileContext }: FeedPreviewProps)
           </div>
         ))}
       </div>
+      
+      {/* Universal full screen image modal */}
+      <ImageViewerModal
+        isOpen={viewerOpen}
+        onClose={() => setViewerOpen(false)}
+        title={viewerTitle}
+        svgContent={viewerSvg}
+        filename={viewerFilename}
+      />
     </div>
   );
 }

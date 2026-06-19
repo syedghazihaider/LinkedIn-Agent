@@ -49,6 +49,7 @@ export interface OptimizeResponse {
   optimization: ProfileOptimization;
   posts: LinkedInPost[];
   weeklyPlan: WeekPlan[];
+  isQuotaFallback?: boolean;
 }
 
 export interface ChatMessage {
@@ -65,7 +66,25 @@ export interface TerminalSimulation {
   outputLines: string[];
 }
 
+export interface CodeSimulation {
+  language: string;
+  fileName: string;
+  codeLineList: string[];
+}
+
 export interface TopicPostResponse {
   post: LinkedInPost;
-  terminalSimulation: TerminalSimulation;
+  terminalSimulation?: TerminalSimulation;
+  codeSimulation?: CodeSimulation;
+  isQuotaFallback?: boolean;
 }
+
+export interface MemoryItem {
+  id: string;
+  type: 'link' | 'text' | 'name' | 'prompt' | 'other';
+  label: string;
+  value: string;
+  enabled: boolean;
+  lastUsedAt?: string;
+}
+

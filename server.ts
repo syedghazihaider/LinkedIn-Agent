@@ -437,17 +437,18 @@ Important instructions:
         profile: { ...fallback.profile, ...(parsedData.profile || {}) },
         optimization: { ...fallback.optimization, ...(parsedData.optimization || {}) },
         posts: parsedData.posts && Array.isArray(parsedData.posts) && parsedData.posts.length > 0 ? parsedData.posts : fallback.posts,
-        weeklyPlan: parsedData.weeklyPlan && Array.isArray(parsedData.weeklyPlan) && parsedData.weeklyPlan.length > 0 ? parsedData.weeklyPlan : fallback.weeklyPlan
+        weeklyPlan: parsedData.weeklyPlan && Array.isArray(parsedData.weeklyPlan) && parsedData.weeklyPlan.length > 0 ? parsedData.weeklyPlan : fallback.weeklyPlan,
+        isQuotaFallback: true
       };
       res.json(merged);
     } else {
-      res.json(parsedData);
+      res.json({ ...parsedData, isQuotaFallback: false });
     }
   } catch (error: any) {
     console.error("Optimize Error; returning beautiful customized fallback metrics:", error);
     try {
       const fallback = getFallbackProfile(rawInput);
-      res.json(fallback);
+      res.json({ ...fallback, isQuotaFallback: true });
     } catch (fallbackErr: any) {
       res.status(500).json({ error: error.message || "An unexpected error occurred during processing." });
     }
@@ -653,18 +654,19 @@ Special Terminal & Code Simulation Rules:
       const merged = {
         post: { ...fallback.post, ...(parsedData.post || {}) },
         terminalSimulation: { ...fallback.terminalSimulation, ...(parsedData.terminalSimulation || {}) },
-        codeSimulation: { ...fallback.codeSimulation, ...(parsedData.codeSimulation || {}) }
+        codeSimulation: { ...fallback.codeSimulation, ...(parsedData.codeSimulation || {}) },
+        isQuotaFallback: true
       };
       res.json(merged);
     } else {
-      res.json(parsedData);
+      res.json({ ...parsedData, isQuotaFallback: false });
     }
   } catch (error: any) {
     console.error("Custom Topic Post Gen Error:", error);
     // Bulletproof Fallback
     try {
       const fallback = getFallbackTopicPost(topic, profileContext);
-      res.json(fallback);
+      res.json({ ...fallback, isQuotaFallback: true });
     } catch (fallbackErr: any) {
       res.status(500).json({ error: error.message || "An unexpected error occurred during custom post generation." });
     }
@@ -673,13 +675,21 @@ Special Terminal & Code Simulation Rules:
 
 // Serve frontend assets
 async function startServer() {
-  if (process.env.NODE_ENV !== "production") {
+  const isProduction = process.env.NODE_ENV === "production" || 
+                       (process.argv[1] && (
+                         process.argv[1].includes("dist") || 
+                         path.basename(process.argv[1]).endsWith(".cjs")
+                       ));
+
+  if (!isProduction) {
+    console.log("Starting server in DEVELOPMENT mode with Vite live reload...");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
   } else {
+    console.log("Starting server in PRODUCTION mode with static assets serving...");
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {

@@ -5,6 +5,7 @@ import ProfileLayout from "./components/ProfileLayout";
 import FeedPreview from "./components/FeedPreview";
 import WeeklySchedule from "./components/WeeklySchedule";
 import AgentChat from "./components/AgentChat";
+import MemoryVault from "./components/MemoryVault";
 import { OptimizeResponse } from "./types";
 import { Sparkles, FileText, ArrowLeft, RefreshCw, Layers, Send, HelpCircle, Check, Briefcase } from "lucide-react";
 
@@ -14,6 +15,7 @@ export default function App() {
   const [loadingStep, setLoadingStep] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
   const [activeTab, setActiveTab] = useState<"audit" | "posts" | "schedule" | "advisor">("audit");
+  const [isMemoryVaultOpen, setIsMemoryVaultOpen] = useState(false);
 
   const loadingMessages = [
     "🤖 Activated Ghazi's LinkedIn Agent...",
@@ -50,7 +52,8 @@ export default function App() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to optimize profile. Check your server logs or key configuration.");
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to optimize profile. Check your server logs or key configuration.");
       }
 
       const data = await response.json();
@@ -73,7 +76,7 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col justify-between" id="app-root">
       <div>
         {/* Universal Sticky Header */}
-        <Header />
+        <Header onOpenMemoryVault={() => setIsMemoryVaultOpen(true)} />
 
         {/* Loading State */}
         {isLoading && (
@@ -176,6 +179,27 @@ export default function App() {
               </div>
             </div>
 
+            {/* Fallback Banner */}
+            {optimizedData.isQuotaFallback && (
+              <div className="bg-amber-50 border border-amber-200/80 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs text-left animate-in fade-in slide-in-from-top-3 duration-350">
+                <div className="flex gap-2.5 items-start">
+                  <span className="text-xl shrink-0">⚡</span>
+                  <div>
+                    <h5 className="font-bold text-amber-900 text-xs uppercase tracking-wider">
+                      Quota Protection Active
+                    </h5>
+                    <p className="text-[11px] text-amber-700 mt-1 leading-relaxed">
+                      AI Studio's free tier has temporarily reached its daily maximum requests quota (20 calls/day limit). 
+                      Your dynamic personal audit reports, code mockups, and writing guides remain <strong>100% functional</strong> via optimized localized templates!
+                    </p>
+                  </div>
+                </div>
+                <div className="bg-amber-105/10 border border-amber-200/50 text-amber-800 text-[9px] font-extrabold uppercase tracking-widest px-2.5 py-1 rounded shrink-0 self-end sm:self-center bg-amber-100">
+                  Live Fallback Mode
+                </div>
+              </div>
+            )}
+
             {/* Core Segmented Nav Tabs */}
             <div className="flex border-b border-slate-200 gap-2 overflow-x-auto pb-0.5">
               <button
@@ -267,6 +291,12 @@ export default function App() {
           </div>
         </div>
       </footer>
+
+      {/* Persistence Memory Vault Dialog */}
+      <MemoryVault
+        isOpen={isMemoryVaultOpen}
+        onClose={() => setIsMemoryVaultOpen(false)}
+      />
     </div>
   );
 }

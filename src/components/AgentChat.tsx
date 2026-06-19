@@ -67,7 +67,8 @@ Would you like 3 more posts, a specific topic, or tips on engaging with your net
       });
 
       if (!response.ok) {
-        throw new Error("Chat api failed to respond.");
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Chat api failed to respond.");
       }
 
       const data = await response.json();
@@ -82,7 +83,12 @@ Would you like 3 more posts, a specific topic, or tips on engaging with your net
       setMessages(prev => [...prev, assistantMsg]);
     } catch (err: any) {
       console.error(err);
-      setErrorText("There was an issue reaching your AI Agent. Make sure your server is online.");
+      const errMsg = err.message || "";
+      if (errMsg.includes("quota") || errMsg.includes("429") || errMsg.includes("RESOURCE_EXHAUSTED") || errMsg.includes("Limit")) {
+        setErrorText("API Quota Exceeded (Limit: 20 calls/day reached). 💡 Tip: Look at the visual tabs above for your fully optimized profile report, drafts, and calendar scheduled templates which remain active!");
+      } else {
+        setErrorText(errMsg || "There was an issue reaching your AI Agent. Make sure your server is online.");
+      }
     } finally {
       setIsSubmitting(false);
     }
